@@ -1,0 +1,8 @@
+{
+	"required": true,
+	"package": "com.rafalohaki.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": ["ExampleMixin"],
+	"injectors": {"defaultRequire": 1},
+	"overwrites": {"requireAnnotations": true}
+}
