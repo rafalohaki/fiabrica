@@ -7,6 +7,7 @@ import com.rafalohaki.module.modules.FlyModule
 import com.rafalohaki.module.modules.KillauraModule
 import imgui.ImGui
 import imgui.flag.ImGuiWindowFlags
+import imgui.type.ImBoolean
 import net.minecraft.client.MinecraftClient
 
 class FiabricaGuiApp : CraftApp() {
@@ -52,7 +53,8 @@ class FiabricaGuiApp : CraftApp() {
         }
         
         modules.forEach { module ->
-            val enabled = booleanArrayOf(module.enabled)
+            // ImGui checkbox requires ImBoolean wrapper
+            val enabled = ImBoolean(module.enabled)
             if (ImGui.checkbox(module.name, enabled)) {
                 module.toggle()
             }
@@ -92,14 +94,14 @@ class FiabricaGuiApp : CraftApp() {
                             module.setRotationSpeed(rotSpeed[0])
                         }
                         
-                        val playersOnly = booleanArrayOf(module.playersOnly)
+                        val playersOnly = ImBoolean(module.playersOnly)
                         if (ImGui.checkbox("Players Only##ka", playersOnly)) {
-                            module.setPlayersOnly(playersOnly[0])
+                            module.setPlayersOnly(playersOnly.get())
                         }
                         
-                        val throughWalls = booleanArrayOf(module.throughWalls)
+                        val throughWalls = ImBoolean(module.throughWalls)
                         if (ImGui.checkbox("Through Walls##ka", throughWalls)) {
-                            module.setThroughWalls(throughWalls[0])
+                            module.setThroughWalls(throughWalls.get())
                         }
                         
                         ImGui.unindent()

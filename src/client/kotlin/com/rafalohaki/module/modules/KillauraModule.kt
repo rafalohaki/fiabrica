@@ -13,7 +13,6 @@ import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket
 import net.minecraft.util.Hand
-import net.minecraft.util.hit.BlockHitResult
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.RaycastContext
@@ -217,7 +216,7 @@ class KillauraModule : Module(
         val world = mc.world ?: return false
         
         val eyePos = player.getEyePos()
-        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val direction = targetPos.subtract(eyePos).normalize()
         val distance = eyePos.distanceTo(targetPos)
         
@@ -244,7 +243,7 @@ class KillauraModule : Module(
         val player = mc.player ?: return Pair(0f, 0f)
         
         val eyePos = player.getEyePos()
-        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val diff = targetPos.subtract(eyePos)
         
         val distance = sqrt(diff.x * diff.x + diff.z * diff.z)
@@ -338,9 +337,7 @@ class KillauraModule : Module(
         }
         
         // Reset sprint (vanilla behavior)
-        if (player.isSprinting) {
-            player.isSprinting = false
-        }
+        player.resetLastAttackedTicks()
     }
     
     /**

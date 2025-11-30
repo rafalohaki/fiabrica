@@ -8,7 +8,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Thread-safe for concurrent registration/unregistration.
  */
 object EventBus {
-    private val listeners = ConcurrentHashMap<Class<out Event>, CopyOnWriteArrayList<EventListener<*>>>()
+    @PublishedApi
+    internal val listeners = ConcurrentHashMap<Class<out Event>, CopyOnWriteArrayList<EventListener<*>>>()
     
     /**
      * Register a listener for a specific event type.
@@ -33,7 +34,8 @@ object EventBus {
     fun post(event: Event) {
         listeners[event::class.java]?.forEach { listener ->
             try {
-                listener.handler(event)
+                @Suppress("UNCHECKED_CAST")
+                (listener.handler as (Event) -> Unit)(event)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
