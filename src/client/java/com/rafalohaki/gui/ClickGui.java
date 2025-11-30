@@ -94,7 +94,7 @@ public class ClickGui extends Screen {
         
         int y = startY - scrollOffset;
         
-        for (Module module : modules) {
+        for (com.rafalohaki.module.Module module : modules) {
             if (y < startY - moduleHeight) {
                 y += moduleHeight + 5;
                 continue;
@@ -170,8 +170,7 @@ public class ClickGui extends Screen {
         return false;
     }
     
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             // Check category button clicks
             Category[] categories = Category.values();
@@ -193,7 +192,7 @@ public class ClickGui extends Screen {
             int startY = 70;
             int moduleY = startY - scrollOffset;
             
-            for (Module module : modules) {
+            for (com.rafalohaki.module.Module module : modules) {
                 if (mouseX >= startX && mouseX <= startX + moduleButtonWidth &&
                     mouseY >= moduleY && mouseY <= moduleY + moduleHeight) {
                     module.toggle();
@@ -203,7 +202,7 @@ public class ClickGui extends Screen {
             }
         }
         
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
     
     @Override

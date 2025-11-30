@@ -159,12 +159,12 @@ public class KillauraModule extends Module {
         // --- Krok 4: Wysyłanie pakietów (FLICK!) ---
         // A. Wysyłamy PAKIET Z OBROTEM pozycję i rotację. To jest "flick".
         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.Full(
-            mc.player.getX(), mc.player.getY(), mc.player.getZ(), 
-            finalYaw, finalPitch, mc.player.isOnGround()
+            new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()),
+            finalYaw, finalPitch, mc.player.isOnGround(), mc.player.horizontalCollision
         ));
 
         // B. NATYCHMIAST wysyłamy pakiet ATAKU.
-        mc.getNetworkHandler().sendPacket(new PlayerInteractEntityC2SPacket(target, mc.player.isSneaking()));
+        mc.getNetworkHandler().sendPacket(PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking()));
 
         // C. Opcjonalnie, wymach ręką (losowy)
         if (random.nextFloat() > 0.15f) {
@@ -178,7 +178,7 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
         
-        Vec3d playerPos = mc.player.getPos();
+        Vec3d playerPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
         Box box = new Box(playerPos, playerPos).expand(range * 2, range * 2, range * 2);
         
         List<Entity> entities = mc.world.getOtherEntities(mc.player, box, entity -> 
