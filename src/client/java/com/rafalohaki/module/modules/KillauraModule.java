@@ -75,18 +75,16 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
 
-        // Losowe ticki - psujemy automatyzm
+        // Scan PRZED sprawdzeniem ticków
+        scanForTargets();
+        
+        // Losowe opóźnienie ataków
         tickCounter++;
         if (tickCounter < nextActionTick) {
-            return; // Nic nie rób w tym ticku
+            return;
         }
         tickCounter = 0;
-        nextActionTick = random.nextInt(2, 5); // Ustaw następny losowy interwał
-
-        // Scan for targets in main thread instead of background
-        if (tickCounter == 0) { // Only scan occasionally
-            scanForTargets();
-        }
+        nextActionTick = random.nextInt(2, 5);
         
         LivingEntity target = currentTarget.get();
         if (target == null || !isValidTarget(target)) {
@@ -94,11 +92,11 @@ public class KillauraModule extends Module {
             return;
         }
 
-        // Prosty warunek ataku, bez dodatkowych stanów
+        // Atak TYLKO gdy cooldown gotowy
         float cooldown = mc.player.getAttackCooldownProgress(0.5f);
         long timeSinceLastAttack = System.currentTimeMillis() - lastAttackTime;
 
-        if (cooldown >= 0.9f && timeSinceLastAttack >= nextAttackDelay) {
+        if (cooldown >= 0.95f && timeSinceLastAttack >= nextAttackDelay) {
             // Walidacja zasięgu PRZED atakiem
             if (mc.player.distanceTo(target) <= range) {
                 // Wykonaj całą akcję w jednej funkcji
@@ -123,17 +121,19 @@ public class KillauraModule extends Module {
         if (mc.player == null || mc.getNetworkHandler() == null) return;
 
         // --- Krok 1: Prognozowanie ---
-        // Pobieramy ping w tickach, uproszczony model
-        int pingInTicks = (mc.getNetworkHandler().getPlayerListEntry(target.getUuid()) != null) 
-            ? mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency() / 50 
-            : 2; // Zakładamy 2 ticki, jeśli nie mamy pinga
-        float predictionTimeTicks = pingInTicks + 1; // Dodajemy 1 tick bufora na serwer
+        // Ping w ms, nie w tickach
+        int pingMs = (mc.getNetworkHandler().getPlayerListEntry(target.getUuid()) != null) 
+            ? mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency() 
+            : 100; // Default 100ms
+
+        // Konwertuj ms -> ticki (1 tick = 50ms)
+        float predictionTicks = (pingMs / 50.0f) + 1.0f;
 
         // Oblicz przewidywaną pozycję
         Vec3d predictedPos = new Vec3d(
-            target.getX() + target.getVelocity().x * predictionTimeTicks,
-            target.getY() + target.getVelocity().y * predictionTimeTicks,
-            target.getZ() + target.getVelocity().z * predictionTimeTicks
+            target.getX() + target.getVelocity().x * predictionTicks,
+            target.getY() + target.getVelocity().y * predictionTicks,
+            target.getZ() + target.getVelocity().z * predictionTicks
         );
 
         // --- Krok 2: Obliczanie rotacji do przewidzianej pozycji ---
@@ -220,26 +220,18 @@ public class KillauraModule extends Module {
         if (mc.player == null || mc.world == null) return false;
         
         Vec3d eyePos = mc.player.getEyePos();
-        Vec3d targetCenter = new Vec3d(
-            target.getX(),
-            target.getY() + target.getStandingEyeHeight() * 0.5,
-            target.getZ()
-        );
-        Vec3d direction = targetCenter.subtract(eyePos).normalize();
-        double distance = eyePos.distanceTo(targetCenter);
+        Vec3d targetPos = target.getEyePos();
         
+        // Używamy raycast z opcją throughWalls
         RaycastContext context = new RaycastContext(
-            eyePos,
-            eyePos.add(direction.multiply(distance, distance, distance)),
+            eyePos, targetPos,
             RaycastContext.ShapeType.OUTLINE,
             RaycastContext.FluidHandling.NONE,
             mc.player
         );
         
         var result = mc.world.raycast(context);
-        return result == null ||
-               result.getType() == net.minecraft.util.hit.HitResult.Type.MISS ||
-               result.getPos().distanceTo(eyePos) >= distance - 0.1;
+        return result.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
     }
     
     private float normalizeYaw(float yaw) {

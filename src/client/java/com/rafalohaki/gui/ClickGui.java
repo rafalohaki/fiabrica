@@ -32,15 +32,15 @@ public class ClickGui extends Screen {
     private final int categoryButtonWidth = 85;
     private final int moduleButtonWidth = 140;
     
-    // Colors - improved contrast and modern palette
-    private static final int COLOR_BACKGROUND = 0xDD0a0a0f;
-    private static final int COLOR_PANEL = 0xEE1e1e2e;
-    private static final int COLOR_ACCENT = 0xFF2563eb;
-    private static final int COLOR_ENABLED = 0xFF10b981;
+    // Colors - improved contrast and modern palette (proper AARRGGBB format)
+    private static final int COLOR_BACKGROUND = 0xDD0A0A0F;
+    private static final int COLOR_PANEL = 0xEE1E1E2E;
+    private static final int COLOR_ACCENT = 0xFF2563EB;
+    private static final int COLOR_ENABLED = 0xFF10B981;
     private static final int COLOR_DISABLED = 0xFF374151;
-    private static final int COLOR_HOVER = 0xFF4b5563;
+    private static final int COLOR_HOVER = 0xFF4B5563;
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_SECONDARY = 0xFF9ca3af;
+    private static final int COLOR_TEXT_SECONDARY = 0xFF9CA3AF;
     private static final int COLOR_BORDER = 0xFF475569;
     
     // Input state
@@ -101,8 +101,8 @@ public class ClickGui extends Screen {
         context.fill(0, 0, this.width, this.height, animatedBg);
         
         // Draw main panel with rounded corners effect
-        int panelX = 20;
-        int panelY = 30;
+        panelX = 20;
+        panelY = 30;
         int panelWidth = this.width - 40;
         int panelHeight = this.height - 60;
         
@@ -162,7 +162,7 @@ public class ClickGui extends Screen {
         
         if (deltaTime > 16) { // Cap at ~60 FPS
             if (animationProgress < 1.0f) {
-                animationProgress = Math.min(1.0f, animationProgress + delta * 0.1f);
+                animationProgress = Math.min(1.0f, animationProgress + delta * 4.0f);
             }
             lastAnimationTime = currentTime;
         }
@@ -172,9 +172,14 @@ public class ClickGui extends Screen {
         // Simple rounded corners using multiple rectangles
         int cornerSize = 8;
         
-        // Main body
-        context.fill(x + cornerSize, y, x + width - cornerSize, y + height, color);
-        context.fill(x, y + cornerSize, x + width, y + height - cornerSize, color);
+        // Main body (center area)
+        context.fill(x + cornerSize, y + cornerSize, x + width - cornerSize, y + height - cornerSize, color);
+        
+        // Side strips
+        context.fill(x + cornerSize, y, x + width - cornerSize, y + cornerSize, color);
+        context.fill(x + cornerSize, y + height - cornerSize, x + width - cornerSize, y + height, color);
+        context.fill(x, y + cornerSize, x + cornerSize, y + height - cornerSize, color);
+        context.fill(x + width - cornerSize, y + cornerSize, x + width, y + height - cornerSize, color);
         
         // Corner pieces (rounded effect)
         context.fill(x + cornerSize, y + cornerSize, x + cornerSize * 2, y + cornerSize * 2, color);
