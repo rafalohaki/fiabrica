@@ -75,11 +75,14 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
 
-        // Scan PRZED sprawdzeniem ticków
-        scanForTargets();
-        
-        // Losowe opóźnienie ataków
         tickCounter++;
+        
+        // Skanuj co 3 ticki zamiast w każdym (optymalizacja)
+        if (tickCounter % 3 == 0) {
+            scanForTargets();
+        }
+        
+        // Losowe opóźnienie między atakami
         if (tickCounter < nextActionTick) {
             return;
         }
@@ -92,18 +95,15 @@ public class KillauraModule extends Module {
             return;
         }
 
-        // Atak TYLKO gdy cooldown gotowy
+        // Sprawdź cooldown
         float cooldown = mc.player.getAttackCooldownProgress(0.5f);
         long timeSinceLastAttack = System.currentTimeMillis() - lastAttackTime;
 
-        if (cooldown >= 0.95f && timeSinceLastAttack >= nextAttackDelay) {
-            // Walidacja zasięgu PRZED atakiem
+        if (cooldown >= 0.9f && timeSinceLastAttack >= nextAttackDelay) {
             if (mc.player.distanceTo(target) <= range) {
-                // Wykonaj całą akcję w jednej funkcji
                 performFlickAttack(target); 
-                
                 lastAttackTime = System.currentTimeMillis();
-                nextAttackDelay = calculateRandomDelay(); // Ustaw nowy losowy czas do ataku
+                nextAttackDelay = calculateRandomDelay();
             }
         }
     }
@@ -120,71 +120,62 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.getNetworkHandler() == null) return;
 
-        // --- Krok 1: Analiza velocity i predykcja ---
+        // Pobierz interpolowaną pozycję (wizualną)
+        Vec3d currentPos = new Vec3d(target.getX(), target.getY(), target.getZ());
         Vec3d velocity = target.getVelocity();
         double velocityMagnitude = velocity.length();
         
-        // Detekcja knockbacku - jeśli velocity > 0.3, prawdopodobnie knockback
-        boolean isKnockback = velocityMagnitude > 0.3;
+        // Detekcja knockbacku
+        boolean isKnockback = velocityMagnitude > 0.35;
         
-        // Ping w ms
-        int pingMs = (mc.getNetworkHandler().getPlayerListEntry(target.getUuid()) != null) 
-            ? mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency() 
-            : 100;
-
-        // Predykcja TYLKO dla normalnego ruchu, nie dla knockbacku
-        float predictionTicks = 0.0f;
-        
-        if (!isKnockback && velocityMagnitude > 0.05) {
-            // Normalny ruch - użyj predykcji ping-based
-            predictionTicks = (pingMs / 50.0f) * 0.5f; // Zmniejszony mnożnik (50% pinga)
-        } else if (isKnockback) {
-            // Knockback - celuj w AKTUALNĄ pozycję lub lekko do tyłu
-            predictionTicks = -0.2f; // Lekko "do tyłu" kompensuje opóźnienie
+        // Ping
+        int pingMs = 100;
+        if (mc.getNetworkHandler().getPlayerListEntry(target.getUuid()) != null) {
+            pingMs = mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency();
         }
 
-        // Oblicz przewidywaną pozycję
-        Vec3d predictedPos = new Vec3d(
-            target.getX() + velocity.x * predictionTicks,
-            target.getY() + velocity.y * predictionTicks,
-            target.getZ() + velocity.z * predictionTicks
-        );
+        // Predykcja
+        Vec3d predictedPos;
+        if (isKnockback || velocityMagnitude < 0.08) {
+            // Knockback lub stoi - bez predykcji
+            predictedPos = currentPos;
+        } else {
+            // Normalny ruch - predykcja ping-based (zmniejszona)
+            float predictionTicks = Math.min(3.0f, (pingMs / 50.0f) * 0.6f);
+            predictedPos = new Vec3d(
+                currentPos.x + velocity.x * predictionTicks,
+                currentPos.y + velocity.y * predictionTicks,
+                currentPos.z + velocity.z * predictionTicks
+            );
+        }
 
-        // --- Krok 2: Obliczanie rotacji ---
+        // Oblicz rotacje
         Vec3d eyePos = mc.player.getEyePos();
         
-        // Celuj w środek hitboxa (bez losowania przy knockbacku dla stabilności)
-        double heightOffset;
-        if (isKnockback) {
-            heightOffset = target.getStandingEyeHeight() * 0.5; // Środek
-        } else {
-            heightOffset = target.getStandingEyeHeight() * (0.4 + random.nextDouble() * 0.3);
-        }
+        // Konsystentna wysokość celowania (55% + mała losowość)
+        double heightOffset = target.getStandingEyeHeight() * 0.55;
+        heightOffset += (random.nextDouble() - 0.5) * 0.1 * target.getStandingEyeHeight();
         
-        Vec3d aimPoint = new Vec3d(
-            predictedPos.x, 
-            predictedPos.y + heightOffset, 
-            predictedPos.z
-        );
-        
+        Vec3d aimPoint = new Vec3d(predictedPos.x, predictedPos.y + heightOffset, predictedPos.z);
         Vec3d diff = aimPoint.subtract(eyePos);
         double distanceXZ = Math.sqrt(diff.x * diff.x + diff.z * diff.z);
         
         float idealYaw = (float) Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90f;
         float idealPitch = (float) -Math.toDegrees(Math.atan2(diff.y, distanceXZ));
         
-        // --- Krok 3: Jitter (mniejszy przy knockbacku) ---
-        float jitterScale = isKnockback ? 0.5f : 1.0f;
-        float jitterYaw = (random.nextFloat() - 0.5f) * 1.5f * jitterScale;
-        float jitterPitch = (random.nextFloat() - 0.5f) * 1.0f * jitterScale;
+        // Jitter - mniejszy przy knockbacku
+        float jitterScale = isKnockback ? 0.3f : 0.8f;
+        float jitterYaw = (random.nextFloat() - 0.5f) * 1.2f * jitterScale;
+        float jitterPitch = (random.nextFloat() - 0.5f) * 0.8f * jitterScale;
         
         float finalYaw = normalizeYaw(idealYaw + jitterYaw);
         float finalPitch = Math.max(-90f, Math.min(90f, idealPitch + jitterPitch));
 
-        // --- Krok 4: Wysyłanie pakietów ---
-        // Poprawiony konstruktor dla Minecraft 1.21 - użyj Vec3d z getX/Y/Z
+        // POPRAWIONY pakiet - dodaj horizontalCollision
         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.Full(
-            new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()),
+            mc.player.getX(), 
+            mc.player.getY(), 
+            mc.player.getZ(),
             finalYaw, 
             finalPitch, 
             mc.player.isOnGround(),
@@ -195,7 +186,7 @@ public class KillauraModule extends Module {
             PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking())
         );
 
-        if (random.nextFloat() > 0.15f) {
+        if (random.nextFloat() > 0.1f) {
             mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
         }
         
@@ -248,18 +239,29 @@ public class KillauraModule extends Module {
         if (mc.player == null || mc.world == null) return false;
         
         Vec3d eyePos = mc.player.getEyePos();
-        Vec3d targetPos = target.getEyePos();
         
-        // Używamy raycast z opcją throughWalls
-        RaycastContext context = new RaycastContext(
-            eyePos, targetPos,
-            RaycastContext.ShapeType.OUTLINE,
-            RaycastContext.FluidHandling.NONE,
-            mc.player
-        );
+        // Testuj 3 punkty hitboxa
+        Vec3d[] testPoints = {
+            new Vec3d(target.getX(), target.getY() + 0.2, target.getZ()),
+            new Vec3d(target.getX(), target.getY() + target.getHeight() * 0.5, target.getZ()),
+            target.getEyePos()
+        };
         
-        var result = mc.world.raycast(context);
-        return result.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
+        for (Vec3d testPoint : testPoints) {
+            RaycastContext context = new RaycastContext(
+                eyePos, testPoint,
+                RaycastContext.ShapeType.OUTLINE,
+                RaycastContext.FluidHandling.NONE,
+                mc.player
+            );
+            
+            var result = mc.world.raycast(context);
+            if (result.getType() == net.minecraft.util.hit.HitResult.Type.MISS) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     private float normalizeYaw(float yaw) {
