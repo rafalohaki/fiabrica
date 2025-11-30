@@ -1,0 +1,84 @@
+# Gradle
+.gradle/
+build/
+out/
+bin/
+
+# Gradle Wrapper (keep wrapper jar)
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# IDE - Eclipse
+.classpath
+.project
+.settings/
+
+# IDE - VSCode
+.vscode/
+
+# IDE - NetBeans
+nbproject/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Minecraft run directories
+run/
+runs/
+logs/
+
+# Fabric
+.fabric/
+remappedSrc/
+
+# Compiled output
+*.class
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# Crash reports
+hs_err_pid*
+crash-reports/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Package files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.rar
+*.tar
+*.zip
+
+# JVM memory dumps
+*.hprof
+
+# Local configuration
+local.properties
+
+# Secrets
+*.env
+.env.local
