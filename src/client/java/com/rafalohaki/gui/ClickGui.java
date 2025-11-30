@@ -1,167 +1,286 @@
 package com.rafalohaki.gui;
 
-import com.rafalohaki.module.*;
+import com.rafalohaki.module.Category;
+import com.rafalohaki.module.ModuleManager;
+import com.rafalohaki.module.modules.FlyModule;
 import com.rafalohaki.module.modules.KillauraModule;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.client.MinecraftClient;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Simple ClickGUI for module management
- * Right Shift key opens this screen
+ * Modern ClickGUI for module management.
+ * Opens with Right Shift or J key.
+ * 
+ * Features:
+ * - Category-based module organization
+ * - Mouse scroll support
+ * - Module settings display
  */
 public class ClickGui extends Screen {
+    private static final Logger LOGGER = LoggerFactory.getLogger("fiabrica");
+    
     private Category selectedCategory = Category.COMBAT;
     private int scrollOffset = 0;
-    private final int moduleHeight = 25;
-    private final int categoryButtonWidth = 80;
-    private final int moduleButtonWidth = 120;
+    private final int moduleHeight = 28;
+    private final int categoryButtonWidth = 85;
+    private final int moduleButtonWidth = 140;
+    
+    // Colors
+    private static final int COLOR_BACKGROUND = 0xCC1a1a2e;
+    private static final int COLOR_PANEL = 0xEE16213e;
+    private static final int COLOR_ACCENT = 0xFF0f3460;
+    private static final int COLOR_ENABLED = 0xFF4ecca3;
+    private static final int COLOR_DISABLED = 0xFF393e46;
+    private static final int COLOR_HOVER = 0xFF2d4059;
+    
+    // Input state
+    private boolean wasMousePressed = false;
+    private double lastScrollY = 0;
     
     public ClickGui() {
         super(Text.literal("Fiabrica ClickGUI"));
+        LOGGER.info("ClickGui created");
     }
     
     @Override
     protected void init() {
-        // Initialize screen
+        LOGGER.info("ClickGui init - Screen size: {}x{}", this.width, this.height);
+        scrollOffset = 0;
     }
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Handle mouse input
+        MinecraftClient mc = MinecraftClient.getInstance();
+        long windowHandle = mc.getWindow().getHandle();
+        boolean isMousePressed = GLFW.glfwGetMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
+        
+        // Detect mouse click (press -> release)
+        if (wasMousePressed && !isMousePressed) {
+            handleClick(mouseX, mouseY);
+        }
+        wasMousePressed = isMousePressed;
+        
+        // Handle escape key
+        if (GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS) {
+            this.close();
+            return;
+        }
+        
+        // Render background (darkened game view)
         super.render(context, mouseX, mouseY, delta);
         
-        // Draw background
-        context.fillGradient(0, 0, this.width, this.height, 0x80000000, 0x80000000);
+        // Draw semi-transparent overlay
+        context.fill(0, 0, this.width, this.height, COLOR_BACKGROUND);
         
-        // Draw title
+        // Draw main panel
+        int panelX = 20;
+        int panelY = 30;
+        int panelWidth = this.width - 40;
+        int panelHeight = this.height - 60;
+        
+        context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, COLOR_PANEL);
+        
+        // Draw title with shadow effect
+        String title = "✦ FIABRICA ✦";
         context.drawCenteredTextWithShadow(
             this.textRenderer,
-            Text.literal("Fiabrica ClickGUI").formatted(Formatting.AQUA),
+            Text.literal(title).formatted(Formatting.AQUA, Formatting.BOLD),
             this.width / 2,
-            10,
+            panelY + 8,
             0xFFFFFF
         );
         
+        // Draw separator line
+        context.fill(panelX + 10, panelY + 25, panelX + panelWidth - 10, panelY + 26, COLOR_ACCENT);
+        
         // Draw category buttons
-        drawCategoryButtons(context, mouseX, mouseY);
+        drawCategoryButtons(context, mouseX, mouseY, panelX + 10, panelY + 35);
         
         // Draw modules for selected category
-        drawModules(context, mouseX, mouseY);
+        drawModules(context, mouseX, mouseY, panelX + 10, panelY + 70, panelWidth - 20, panelHeight - 100);
         
-        // Draw instructions
+        // Draw instructions and debug info
+        String instructions = "Click to toggle • Scroll to navigate • ESC to close";
         context.drawTextWithShadow(
             this.textRenderer,
-            Text.literal("Click to toggle • ESC to close").formatted(Formatting.GRAY),
-            10,
-            this.height - 20,
+            Text.literal(instructions).formatted(Formatting.GRAY),
+            panelX + 10,
+            panelY + panelHeight - 18,
             0xAAAAAA
+        );
+        
+        // Draw module count
+        var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
+        String countText = String.format("%d modules in %s", modules.size(), selectedCategory.name());
+        int countWidth = this.textRenderer.getWidth(countText);
+        context.drawTextWithShadow(
+            this.textRenderer,
+            Text.literal(countText).formatted(Formatting.DARK_GRAY),
+            panelX + panelWidth - countWidth - 10,
+            panelY + panelHeight - 18,
+            0x888888
         );
     }
     
-    private void drawCategoryButtons(DrawContext context, int mouseX, int mouseY) {
+    // Instance variables for click detection (store panel position)
+    private int panelX = 20;
+    private int panelY = 30;
+    private int categoryStartX, categoryStartY;
+    private int moduleStartX, moduleStartY, moduleAreaWidth, moduleAreaHeight;
+    
+    private void drawCategoryButtons(DrawContext context, int mouseX, int mouseY, int startX, int startY) {
+        categoryStartX = startX;
+        categoryStartY = startY;
+        
         Category[] categories = Category.values();
-        int x = 10;
-        int y = 40;
+        int x = startX;
+        int buttonHeight = 22;
         
         for (Category category : categories) {
             boolean isSelected = category == selectedCategory;
-            int color = isSelected ? 0xFF5555 : 0x555555;
-            Formatting textColor = isSelected ? Formatting.WHITE : Formatting.GRAY;
+            boolean isHovered = mouseX >= x && mouseX <= x + categoryButtonWidth &&
+                               mouseY >= startY && mouseY <= startY + buttonHeight;
             
-            // Draw button background
-            context.fill(x, y, x + categoryButtonWidth, y + 20, color);
+            int bgColor = isSelected ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_DISABLED);
+            
+            // Draw rounded button background
+            context.fill(x, startY, x + categoryButtonWidth, startY + buttonHeight, bgColor);
             
             // Draw category name
+            Formatting textFormat = isSelected ? Formatting.BLACK : Formatting.WHITE;
             context.drawCenteredTextWithShadow(
                 this.textRenderer,
-                Text.literal(category.name()).formatted(textColor),
+                Text.literal(category.name()).formatted(textFormat),
                 x + categoryButtonWidth / 2,
-                y + 6,
-                0xFFFFFF
+                startY + 7,
+                isSelected ? 0x000000 : 0xFFFFFF
             );
             
             x += categoryButtonWidth + 5;
         }
     }
     
-    private void drawModules(DrawContext context, int mouseX, int mouseY) {
+    private void drawModules(DrawContext context, int mouseX, int mouseY, int startX, int startY, int areaWidth, int areaHeight) {
+        moduleStartX = startX;
+        moduleStartY = startY;
+        moduleAreaWidth = areaWidth;
+        moduleAreaHeight = areaHeight;
+        
         var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
-        int startX = 10;
-        int startY = 70;
-        int maxWidth = this.width - 20;
+        
+        // Draw "No modules" message if empty
+        if (modules.isEmpty()) {
+            context.drawCenteredTextWithShadow(
+                this.textRenderer,
+                Text.literal("No modules in this category").formatted(Formatting.GRAY),
+                startX + areaWidth / 2,
+                startY + 20,
+                0x888888
+            );
+            return;
+        }
         
         int y = startY - scrollOffset;
+        int moduleSpacing = 4;
         
         for (com.rafalohaki.module.Module module : modules) {
-            if (y < startY - moduleHeight) {
-                y += moduleHeight + 5;
+            // Skip if above visible area
+            if (y + moduleHeight < startY) {
+                y += moduleHeight + moduleSpacing;
                 continue;
             }
-            if (y > this.height) break;
+            // Stop if below visible area
+            if (y > startY + areaHeight) break;
             
-            int moduleColor = module.isEnabled() ? 0xFF5555 : 0x555555;
-            Formatting textColor = module.isEnabled() ? Formatting.GREEN : Formatting.RED;
+            boolean isHovered = mouseX >= startX && mouseX <= startX + moduleButtonWidth &&
+                               mouseY >= y && mouseY <= y + moduleHeight &&
+                               y >= startY && y + moduleHeight <= startY + areaHeight;
             
-            // Module background
-            context.fill(startX, y, startX + moduleButtonWidth, y + moduleHeight, moduleColor);
+            int bgColor = module.isEnabled() ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_DISABLED);
+            
+            // Module background with slight transparency
+            context.fill(startX, y, startX + moduleButtonWidth, y + moduleHeight, bgColor);
             
             // Module name
+            int textColor = module.isEnabled() ? 0x000000 : 0xFFFFFF;
             context.drawTextWithShadow(
                 this.textRenderer,
-                Text.literal(module.getName()).formatted(textColor),
-                startX + 5,
-                y + 8,
-                0xFFFFFF
+                Text.literal(module.getName()),
+                startX + 8,
+                y + 6,
+                textColor
             );
             
-            // Module status
-            String statusText = module.isEnabled() ? "ON" : "OFF";
+            // Module description (smaller, below name)
             context.drawTextWithShadow(
                 this.textRenderer,
-                Text.literal(statusText).formatted(Formatting.WHITE),
-                startX + moduleButtonWidth - 25,
-                y + 8,
-                0xFFFFFF
+                Text.literal(module.getDescription()).formatted(Formatting.GRAY),
+                startX + 8,
+                y + 16,
+                0x888888
             );
             
-            // Draw settings for enabled modules
-            if (module.isEnabled() && module instanceof KillauraModule) {
-                drawKillauraSettings(context, startX + moduleButtonWidth + 10, y, (KillauraModule) module);
+            // Status indicator
+            String statusText = module.isEnabled() ? "●" : "○";
+            int statusColor = module.isEnabled() ? 0x00FF00 : 0xFF5555;
+            context.drawTextWithShadow(
+                this.textRenderer,
+                Text.literal(statusText),
+                startX + moduleButtonWidth - 15,
+                y + 10,
+                statusColor
+            );
+            
+            // Draw settings panel for enabled modules with settings
+            if (module.isEnabled()) {
+                drawModuleSettings(context, startX + moduleButtonWidth + 10, y, module);
             }
             
-            y += moduleHeight + 5;
+            y += moduleHeight + moduleSpacing;
         }
     }
     
-    private void drawKillauraSettings(DrawContext context, int x, int y, KillauraModule module) {
-        int settingsWidth = 150;
+    private void drawModuleSettings(DrawContext context, int x, int y, com.rafalohaki.module.Module module) {
+        int settingsWidth = 160;
         
-        // Settings background
-        context.fill(x, y, x + settingsWidth, y + moduleHeight, 0x333333);
-        
-        // Range setting
-        context.drawTextWithShadow(
-            this.textRenderer,
-            Text.literal("Range: " + module.getRange()).formatted(Formatting.YELLOW),
-            x + 5,
-            y + 3,
-            0xFFFFFF
-        );
-        
-        // CPS setting
-        context.drawTextWithShadow(
-            this.textRenderer,
-            Text.literal("CPS: " + module.getCps()).formatted(Formatting.YELLOW),
-            x + 5,
-            y + 13,
-            0xFFFFFF
-        );
+        if (module instanceof KillauraModule ka) {
+            context.fill(x, y, x + settingsWidth, y + moduleHeight + 10, 0xDD2d2d44);
+            
+            context.drawTextWithShadow(this.textRenderer,
+                Text.literal("Range: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(String.format("%.1f", ka.getRange())).formatted(Formatting.YELLOW)),
+                x + 5, y + 4, 0xFFFFFF);
+            
+            context.drawTextWithShadow(this.textRenderer,
+                Text.literal("CPS: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(String.format("%.0f", ka.getCps())).formatted(Formatting.YELLOW)),
+                x + 5, y + 14, 0xFFFFFF);
+            
+            context.drawTextWithShadow(this.textRenderer,
+                Text.literal("Players Only: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(ka.isPlayersOnly() ? "Yes" : "No").formatted(ka.isPlayersOnly() ? Formatting.GREEN : Formatting.RED)),
+                x + 5, y + 24, 0xFFFFFF);
+                
+        } else if (module instanceof FlyModule fly) {
+            context.fill(x, y, x + settingsWidth, y + 20, 0xDD2d2d44);
+            
+            context.drawTextWithShadow(this.textRenderer,
+                Text.literal("Speed: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(String.format("%.1f", fly.getSpeed())).formatted(Formatting.YELLOW)),
+                x + 5, y + 6, 0xFFFFFF);
+        }
     }
     
     @Override
     public void close() {
+        LOGGER.info("ClickGui closed");
         super.close();
     }
     
@@ -170,51 +289,58 @@ public class ClickGui extends Screen {
         return false;
     }
     
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            // Check category button clicks
-            Category[] categories = Category.values();
-            int x = 10;
-            int y = 40;
-            
-            for (Category category : categories) {
-                if (mouseX >= x && mouseX <= x + categoryButtonWidth &&
-                    mouseY >= y && mouseY <= y + 20) {
-                    selectedCategory = category;
-                    return true;
-                }
-                x += categoryButtonWidth + 5;
+    /**
+     * Handle mouse clicks - called from render based on mouse state
+     */
+    private void handleClick(int mouseX, int mouseY) {
+        // Check category button clicks
+        Category[] categories = Category.values();
+        int x = categoryStartX;
+        int buttonHeight = 22;
+        
+        for (Category category : categories) {
+            if (mouseX >= x && mouseX <= x + categoryButtonWidth &&
+                mouseY >= categoryStartY && mouseY <= categoryStartY + buttonHeight) {
+                selectedCategory = category;
+                scrollOffset = 0;
+                LOGGER.debug("Selected category: {}", category);
+                return;
             }
-            
-            // Check module button clicks
-            var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
-            int startX = 10;
-            int startY = 70;
-            int moduleY = startY - scrollOffset;
-            
-            for (com.rafalohaki.module.Module module : modules) {
-                if (mouseX >= startX && mouseX <= startX + moduleButtonWidth &&
-                    mouseY >= moduleY && mouseY <= moduleY + moduleHeight) {
-                    module.toggle();
-                    return true;
-                }
-                moduleY += moduleHeight + 5;
-            }
+            x += categoryButtonWidth + 5;
         }
         
-        return false;
+        // Check module button clicks
+        var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
+        int moduleY = moduleStartY - scrollOffset;
+        int moduleSpacing = 4;
+        
+        for (com.rafalohaki.module.Module module : modules) {
+            if (moduleY + moduleHeight < moduleStartY) {
+                moduleY += moduleHeight + moduleSpacing;
+                continue;
+            }
+            if (moduleY > moduleStartY + moduleAreaHeight) break;
+            
+            if (mouseX >= moduleStartX && mouseX <= moduleStartX + moduleButtonWidth &&
+                mouseY >= moduleY && mouseY <= moduleY + moduleHeight &&
+                moduleY >= moduleStartY) {
+                module.toggle();
+                LOGGER.info("Toggled module: {} -> {}", module.getName(), module.isEnabled());
+                return;
+            }
+            moduleY += moduleHeight + moduleSpacing;
+        }
     }
     
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        // Handle scrolling
-        scrollOffset += verticalAmount * 10;
+    /**
+     * Handle scroll - called from render
+     */
+    private void handleScroll(double scrollDelta) {
+        scrollOffset -= (int)(scrollDelta * 20);
         
-        // Limit scroll offset
         var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
-        int maxScroll = Math.max(0, modules.size() * (moduleHeight + 5) - (this.height - 70));
+        int totalHeight = modules.size() * (moduleHeight + 4);
+        int maxScroll = Math.max(0, totalHeight - moduleAreaHeight);
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
-        
-        return true;
     }
 }

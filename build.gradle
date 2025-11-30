@@ -1,7 +1,7 @@
 plugins {
 	id 'fabric-loom' version "1.13-SNAPSHOT"
 	id 'maven-publish'
-	id "org.jetbrains.kotlin.jvm" version "2.2.21"
+	id 'java'
 }
 
 version = '1.0.0'
@@ -12,6 +12,7 @@ base {
 }
 
 repositories {
+	mavenCentral()
 	maven { url = 'https://jitpack.io' }
 }
 
@@ -26,12 +27,13 @@ loom {
 }
 
 dependencies {
+	// Minecraft and mappings
 	minecraft "com.mojang:minecraft:1.21.10"
 	mappings "net.fabricmc:yarn:1.21.10+build.3:v2"
+	
+	// Fabric
 	modImplementation "net.fabricmc:fabric-loader:0.18.1"
 	modImplementation "net.fabricmc.fabric-api:fabric-api:0.138.3+1.21.10"
-	modImplementation "net.fabricmc:fabric-language-kotlin:1.13.7+kotlin.2.2.21"
-	
 }
 
 processResources {
@@ -43,12 +45,9 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
+	it.options.encoding = 'UTF-8'
 }
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-	kotlinOptions {
-		jvmTarget = "21"
-	}
-}
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21

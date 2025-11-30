@@ -1,7 +1,8 @@
 package com.rafalohaki.module;
 
-import com.rafalohaki.module.modules.FlyModule;
-import com.rafalohaki.module.modules.KillauraModule;
+import com.rafalohaki.module.modules.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,17 +12,28 @@ import java.util.List;
  * Singleton pattern for global access.
  */
 public class ModuleManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger("fiabrica");
     private static final ModuleManager INSTANCE = new ModuleManager();
     private final List<Module> modules;
     
     private ModuleManager() {
         this.modules = new ArrayList<>();
-        // Register all modules here
-        register(new FlyModule());
+        
+        // Combat modules
         register(new KillauraModule());
-        // Add more modules:
-        // register(new EspModule());
-        // register(new ScaffoldModule());
+        
+        // Movement modules
+        register(new FlyModule());
+        register(new SpeedModule());
+        register(new AutoSprintModule());
+        
+        // Player modules
+        register(new NoFallModule());
+        
+        // Render modules
+        register(new FullbrightModule());
+        
+        LOGGER.info("Registered {} modules", modules.size());
     }
     
     public static ModuleManager getInstance() {

@@ -1,0 +1,24 @@
+{
+	"key.fiabrica.openGui": "Otwórz Menu Fiabrica",
+	"key.fiabrica.debug": "Fiabrica Debug",
+	"category.fiabrica.main": "Fiabrica",
+	
+	"fiabrica.module.fly": "Latanie",
+	"fiabrica.module.fly.description": "Pozwala latać w trybie przetrwania",
+	"fiabrica.module.killaura": "Killaura",
+	"fiabrica.module.killaura.description": "Zaawansowany combat z techniką flick",
+	"fiabrica.module.speed": "Szybkość",
+	"fiabrica.module.speed.description": "Zwiększa prędkość ruchu",
+	"fiabrica.module.autosprint": "AutoSprint",
+	"fiabrica.module.autosprint.description": "Automatycznie biega podczas ruchu",
+	"fiabrica.module.nofall": "NoFall",
+	"fiabrica.module.nofall.description": "Zapobiega obrażeniom od upadku",
+	"fiabrica.module.fullbright": "Pełna jasność",
+	"fiabrica.module.fullbright.description": "Widzisz w ciemności",
+	
+	"fiabrica.gui.title": "Fiabrica ClickGUI",
+	"fiabrica.gui.instructions": "Kliknij aby przełączyć • ESC aby zamknąć",
+	"fiabrica.gui.on": "WŁ",
+	"fiabrica.gui.off": "WYŁ",
+	"fiabrica.gui.nomodules": "Brak modułów w tej kategorii"
+}

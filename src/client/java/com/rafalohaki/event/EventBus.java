@@ -1,5 +1,8 @@
 package com.rafalohaki.event;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -7,11 +10,14 @@ import java.util.function.Consumer;
 /**
  * Central event bus for all client events.
  * Thread-safe for concurrent registration/unregistration.
+ * 
+ * Uses object identity for unregistering handlers (not equals()).
  */
 public class EventBus {
+    private static final Logger LOGGER = LoggerFactory.getLogger("fiabrica");
     private static final EventBus INSTANCE = new EventBus();
     
-    private final ConcurrentHashMap<Class<? extends Event>, CopyOnWriteArrayList<EventListener<?>>> listeners;
+    private final ConcurrentHashMap<Class<? extends Event>, CopyOnWriteArrayList<Object>> listeners;
     
     private EventBus() {
         this.listeners = new ConcurrentHashMap<>();
@@ -23,34 +29,41 @@ public class EventBus {
     
     /**
      * Register a listener for a specific event type.
+     * The handler object is stored directly for identity-based unregistration.
      */
     public <T extends Event> void register(Class<T> eventClass, Consumer<T> handler) {
         listeners.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>())
-                .add(new EventListener<>(handler));
+                .add(handler);
     }
     
     /**
      * Register a listener for ClientTickEvent using functional interface.
+     * IMPORTANT: Store the handler reference for later unregistration!
      */
     public void register(ClientTickEvent.Handler handler) {
-        register(ClientTickEvent.class, event -> handler.handle(event));
+        listeners.computeIfAbsent(ClientTickEvent.class, k -> new CopyOnWriteArrayList<>())
+                .add(handler);
     }
     
     /**
-     * Unregister all listeners for a specific handler.
+     * Unregister a handler using object identity (==).
+     * The handler must be the SAME object reference that was registered.
      */
-    public <T extends Event> void unregister(Class<T> eventClass, Consumer<T> handler) {
-        CopyOnWriteArrayList<EventListener<?>> eventListeners = listeners.get(eventClass);
+    public <T extends Event> void unregister(Class<T> eventClass, Object handler) {
+        CopyOnWriteArrayList<Object> eventListeners = listeners.get(eventClass);
         if (eventListeners != null) {
-            eventListeners.removeIf(listener -> listener.getHandler().equals(handler));
+            eventListeners.removeIf(listener -> listener == handler);
         }
     }
     
     /**
-     * Unregister ClientTickEvent handler.
+     * Unregister ClientTickEvent handler using object identity.
      */
     public void unregister(ClientTickEvent.Handler handler) {
-        unregister(ClientTickEvent.class, event -> handler.handle(event));
+        CopyOnWriteArrayList<Object> eventListeners = listeners.get(ClientTickEvent.class);
+        if (eventListeners != null) {
+            eventListeners.removeIf(listener -> listener == handler);
+        }
     }
     
     /**
@@ -58,12 +71,17 @@ public class EventBus {
      */
     @SuppressWarnings("unchecked")
     public void post(Event event) {
-        CopyOnWriteArrayList<EventListener<?>> eventListeners = listeners.get(event.getClass());
+        CopyOnWriteArrayList<Object> eventListeners = listeners.get(event.getClass());
         if (eventListeners != null) {
-            for (EventListener<?> listener : eventListeners) {
+            for (Object listener : eventListeners) {
                 try {
-                    ((Consumer<Event>) listener.getHandler()).accept(event);
+                    if (listener instanceof Consumer) {
+                        ((Consumer<Event>) listener).accept(event);
+                    } else if (event instanceof ClientTickEvent && listener instanceof ClientTickEvent.Handler) {
+                        ((ClientTickEvent.Handler) listener).handle((ClientTickEvent) event);
+                    }
                 } catch (Exception e) {
+                    LOGGER.error("Error posting event {}: {}", event.getClass().getSimpleName(), e.getMessage());
                     e.printStackTrace();
                 }
             }
@@ -78,17 +96,9 @@ public class EventBus {
     }
     
     /**
-     * Wrapper for event handler function.
+     * Get the number of listeners for debugging.
      */
-    private static class EventListener<T extends Event> {
-        private final Consumer<T> handler;
-        
-        public EventListener(Consumer<T> handler) {
-            this.handler = handler;
-        }
-        
-        public Consumer<T> getHandler() {
-            return handler;
-        }
+    public int getListenerCount() {
+        return listeners.values().stream().mapToInt(CopyOnWriteArrayList::size).sum();
     }
 }

@@ -3,19 +3,18 @@
 	"id": "fiabrica",
 	"version": "${version}",
 	"name": "fiabrica",
-	"description": "Kotlin Minecraft hacked client mod for Fabric 1.21.10.",
+	"description": "Minecraft utility mod for Fabric 1.21.10 with ClickGUI.",
 	"authors": [
 		"rafalohaki"
 	],
 	"license": "CC0-1.0",
-	"icon": "assets/fiabrica/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			{"value": "com.rafalohaki.Fiabrica", "adapter": "kotlin"}
+			"com.rafalohaki.Fiabrica"
 		],
 		"client": [
-			{"value": "com.rafalohaki.FiabricaClient", "adapter": "kotlin"}
+			"com.rafalohaki.FiabricaClient"
 		]
 	},
 	"mixins": [
@@ -26,7 +25,6 @@
 		"fabricloader": ">=0.18.1",
 		"minecraft": "~1.21.10",
 		"java": ">=21",
-		"fabric-api": "*",
-		"fabric-language-kotlin": "*"
+		"fabric-api": "*"
 	}
 }
