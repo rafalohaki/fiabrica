@@ -125,24 +125,10 @@ public class KillauraModule extends Module {
         Vec3d velocity = target.getVelocity();
         double velocityMagnitude = velocity.length();
         
-        // === POPRAWIONA DETEKCJA KNOCKBACKU ===
-        // Oblicz kierunek: czy velocity oddala target od gracza czy zbliża?
-        Vec3d playerPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
-        Vec3d toTarget = currentPos.subtract(playerPos);
-        double toTargetLength = toTarget.length();
-        
-        boolean isMovingAway = false;
-        if (toTargetLength > 0.01 && velocityMagnitude > 0.05) {
-            Vec3d toTargetNorm = toTarget.normalize();
-            Vec3d velocityNorm = velocity.normalize();
-            double dot = toTargetNorm.dotProduct(velocityNorm);
-            // dot > 0 = zbliża się do gracza, dot < 0 = oddala się (knockback)
-            isMovingAway = dot > 0.2; // Target oddala się od gracza
-        }
-        
-        // Knockback = wysoka velocity LUB oddala się z jakąkolwiek velocity > 0.12
-        // Próg obniżony z 0.35 na 0.15 żeby objąć knockback decay phase
-        boolean isKnockback = velocityMagnitude > 0.15 || (isMovingAway && velocityMagnitude > 0.12);
+        // === PROSTA DETEKCJA KNOCKBACKU ===
+        // Bez skomplikowanej logiki kierunku - tylko próg velocity
+        // Wysoka velocity = knockback, niska = normalny ruch
+        boolean isKnockback = velocityMagnitude > 0.2;  // Prosty, niezawodny próg
         
         // Ping
         int pingMs = 100;
@@ -150,16 +136,16 @@ public class KillauraModule extends Module {
             pingMs = mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency();
         }
 
-        // === POPRAWIONA PREDYKCJA ===
+        // === PROSTA PREDYKCJA ===
         Vec3d predictedPos;
-        if (isKnockback || velocityMagnitude < 0.08) {
-            // Knockback (włącznie z decay) lub stoi - BEZ predykcji
-            // Target jest w knockbacku - celuj w aktualną pozycję
+        if (isKnockback || velocityMagnitude < 0.05) {
+            // Knockback lub prawie stoi - BEZ predykcji
+            // Target jest w knockbacku lub zatrzymany - celuj w aktualną pozycję
             predictedPos = currentPos;
         } else {
-            // Prawdziwy normalny ruch (chodzenie/sprint) - predykcja ping-based
-            // Tylko gdy target się rusza NORMALNIE (nie knockback decay)
-            float predictionTicks = Math.min(2.0f, (pingMs / 50.0f) * 0.6f);
+            // Normalny ruch (0.05 - 0.2) - predykcja ping-based
+            // Obejmuje sprint, chodzenie, ucieczkę - wszystko co NIE jest knockback
+            float predictionTicks = Math.min(1.5f, (pingMs / 50.0f) * 0.5f);
             predictedPos = new Vec3d(
                 currentPos.x + velocity.x * predictionTicks,
                 currentPos.y + velocity.y * predictionTicks,
