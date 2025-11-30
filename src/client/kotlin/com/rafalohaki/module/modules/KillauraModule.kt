@@ -144,7 +144,7 @@ class KillauraModule : Module(
         val player = mc.player ?: return
         val world = mc.world ?: return
         
-        val playerPos = player.getPos()
+        val playerPos = Vec3d(player.x, player.y, player.z)
         val box = Box.of(playerPos, range.toDouble() * 2, range.toDouble() * 2, range.toDouble() * 2)
         val entities = world.getOtherEntities(player, box) { entity ->
             entity is LivingEntity && 
@@ -177,14 +177,14 @@ class KillauraModule : Module(
         val player = mc.player ?: return false
         val world = mc.world ?: return false
         
-        val eyePos = player.getEyePos()
-        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val eyePos = Vec3d(player.x, player.eyeY, player.z)
+        val targetPos = Vec3d(target.x, target.y + target.standingEyeHeight.toDouble() * 0.5, target.z)
         val direction = targetPos.subtract(eyePos).normalize()
         val distance = eyePos.distanceTo(targetPos)
         
         val context = RaycastContext(
             eyePos,
-            eyePos.add(direction.multiply(distance)),
+            eyePos.add(direction.multiply(distance, distance, distance)),
             RaycastContext.ShapeType.OUTLINE,
             RaycastContext.FluidHandling.NONE,
             player
@@ -199,13 +199,13 @@ class KillauraModule : Module(
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return Pair(0f, 0f)
         
-        val eyePos = player.getEyePos()
-        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val eyePos = Vec3d(player.x, player.eyeY, player.z)
+        val targetPos = Vec3d(target.x, target.y + target.standingEyeHeight.toDouble() * 0.5, target.z)
         val diff = targetPos.subtract(eyePos)
         
-        val distance = sqrt(diff.x * diff.x + diff.z * diff.z)
+        val distanceXZ = sqrt(diff.x * diff.x + diff.z * diff.z)
         val yaw = Math.toDegrees(atan2(diff.z, diff.x)).toFloat() - 90f
-        val pitch = -Math.toDegrees(atan2(diff.y, distance)).toFloat()
+        val pitch = -Math.toDegrees(atan2(diff.y, distanceXZ)).toFloat()
         
         return Pair(normalizeYaw(yaw), pitch.coerceIn(-90f, 90f))
     }
