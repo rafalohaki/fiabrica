@@ -155,61 +155,6 @@ class ClickGui : Screen(Text.literal("Fiabrica ClickGUI")) {
         )
     }
     
-    override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
-        if (button == 0) {
-            // Check category buttons
-            val categories = Category.values()
-            var x = 10
-            val y = 40
-            
-            for (category in categories) {
-                if (mouseX >= x && mouseX <= x + categoryButtonWidth && 
-                    mouseY >= y && mouseY <= y + 20) {
-                    selectedCategory = category
-                    return true
-                }
-                x += categoryButtonWidth + 5
-            }
-            
-            // Check module buttons
-            val modules = ModuleManager.getModulesByCategory(selectedCategory)
-            val startX = 10
-            val startY = 70
-            
-            var currentY = startY - scrollOffset
-            for (module in modules) {
-                if (currentY < startY - moduleHeight) {
-                    currentY += moduleHeight + 5
-                    continue
-                }
-                if (currentY > height) break
-                
-                if (mouseX >= startX && mouseX <= startX + moduleButtonWidth && 
-                    mouseY >= currentY && mouseY <= currentY + moduleHeight) {
-                    module.toggle()
-                    return true
-                }
-                
-                currentY += moduleHeight + 5
-            }
-        }
-        
-        return super.mouseClicked(mouseX, mouseY, button)
-    }
-    
-    override fun mouseScrolled(mouseX: Double, mouseY: Double, horizontalAmount: Double, verticalAmount: Double): Boolean {
-        scrollOffset = (scrollOffset - verticalAmount * 10).coerceAtLeast(0)
-        return true
-    }
-    
-    override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
-        if (keyCode == 256) { // ESC key
-            close()
-            return true
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers)
-    }
-    
     override fun close() {
         super.close()
     }
