@@ -1,8 +1,8 @@
 package com.rafalohaki
 
-import com.igrium.craftui.app.AppManager
 import com.rafalohaki.event.ClientTickEvent
 import com.rafalohaki.event.EventBus
+import com.rafalohaki.gui.ClickGui
 import com.rafalohaki.module.ModuleManager
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
@@ -29,7 +29,7 @@ object FiabricaClient : ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register { client ->
             EventBus.post(ClientTickEvent())
             while (openGuiKey.wasPressed()) {
-                AppManager.openApp(FiabricaGuiApp())
+                client.setScreen(ClickGui())
             }
         }
     }

@@ -27,7 +27,6 @@
 		"minecraft": "~1.21.10",
 		"java": ">=21",
 		"fabric-api": "*",
-		"fabric-language-kotlin": "*",
-		"craftui": ">=0.3.0"
+		"fabric-language-kotlin": "*"
 	}
 }
