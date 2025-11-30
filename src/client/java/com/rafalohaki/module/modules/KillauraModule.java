@@ -120,27 +120,52 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.getNetworkHandler() == null) return;
 
-        // --- Krok 1: Prognozowanie ---
-        // Ping w ms, nie w tickach
+        // --- Krok 1: Analiza velocity i predykcja ---
+        Vec3d velocity = target.getVelocity();
+        double velocityMagnitude = velocity.length();
+        
+        // Detekcja knockbacku - jeśli velocity > 0.3, prawdopodobnie knockback
+        boolean isKnockback = velocityMagnitude > 0.3;
+        
+        // Ping w ms
         int pingMs = (mc.getNetworkHandler().getPlayerListEntry(target.getUuid()) != null) 
             ? mc.getNetworkHandler().getPlayerListEntry(target.getUuid()).getLatency() 
-            : 100; // Default 100ms
+            : 100;
 
-        // Konwertuj ms -> ticki (1 tick = 50ms)
-        float predictionTicks = (pingMs / 50.0f) + 1.0f;
+        // Predykcja TYLKO dla normalnego ruchu, nie dla knockbacku
+        float predictionTicks = 0.0f;
+        
+        if (!isKnockback && velocityMagnitude > 0.05) {
+            // Normalny ruch - użyj predykcji ping-based
+            predictionTicks = (pingMs / 50.0f) * 0.5f; // Zmniejszony mnożnik (50% pinga)
+        } else if (isKnockback) {
+            // Knockback - celuj w AKTUALNĄ pozycję lub lekko do tyłu
+            predictionTicks = -0.2f; // Lekko "do tyłu" kompensuje opóźnienie
+        }
 
         // Oblicz przewidywaną pozycję
         Vec3d predictedPos = new Vec3d(
-            target.getX() + target.getVelocity().x * predictionTicks,
-            target.getY() + target.getVelocity().y * predictionTicks,
-            target.getZ() + target.getVelocity().z * predictionTicks
+            target.getX() + velocity.x * predictionTicks,
+            target.getY() + velocity.y * predictionTicks,
+            target.getZ() + velocity.z * predictionTicks
         );
 
-        // --- Krok 2: Obliczanie rotacji do przewidzianej pozycji ---
+        // --- Krok 2: Obliczanie rotacji ---
         Vec3d eyePos = mc.player.getEyePos();
-        // Celuj w losowy punkt na hitboxie celu
-        double heightOffset = target.getStandingEyeHeight() * (0.3 + random.nextDouble() * 0.4);
-        Vec3d aimPoint = new Vec3d(predictedPos.x, predictedPos.y + heightOffset, predictedPos.z);
+        
+        // Celuj w środek hitboxa (bez losowania przy knockbacku dla stabilności)
+        double heightOffset;
+        if (isKnockback) {
+            heightOffset = target.getStandingEyeHeight() * 0.5; // Środek
+        } else {
+            heightOffset = target.getStandingEyeHeight() * (0.4 + random.nextDouble() * 0.3);
+        }
+        
+        Vec3d aimPoint = new Vec3d(
+            predictedPos.x, 
+            predictedPos.y + heightOffset, 
+            predictedPos.z
+        );
         
         Vec3d diff = aimPoint.subtract(eyePos);
         double distanceXZ = Math.sqrt(diff.x * diff.x + diff.z * diff.z);
@@ -148,25 +173,28 @@ public class KillauraModule extends Module {
         float idealYaw = (float) Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90f;
         float idealPitch = (float) -Math.toDegrees(Math.atan2(diff.y, distanceXZ));
         
-        // --- Krok 3: Dodawanie ludzkiego szumu ---
-        // Proste jittery
-        float jitterYaw = (random.nextFloat() - 0.5f) * 1.5f;
-        float jitterPitch = (random.nextFloat() - 0.5f) * 1.0f;
+        // --- Krok 3: Jitter (mniejszy przy knockbacku) ---
+        float jitterScale = isKnockback ? 0.5f : 1.0f;
+        float jitterYaw = (random.nextFloat() - 0.5f) * 1.5f * jitterScale;
+        float jitterPitch = (random.nextFloat() - 0.5f) * 1.0f * jitterScale;
         
         float finalYaw = normalizeYaw(idealYaw + jitterYaw);
         float finalPitch = Math.max(-90f, Math.min(90f, idealPitch + jitterPitch));
 
-        // --- Krok 4: Wysyłanie pakietów (FLICK!) ---
-        // A. Wysyłamy PAKIET Z OBROTEM pozycję i rotację. To jest "flick".
+        // --- Krok 4: Wysyłanie pakietów ---
+        // Poprawiony konstruktor dla Minecraft 1.21 - użyj Vec3d z getX/Y/Z
         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.Full(
             new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()),
-            finalYaw, finalPitch, mc.player.isOnGround(), mc.player.horizontalCollision
+            finalYaw, 
+            finalPitch, 
+            mc.player.isOnGround(),
+            mc.player.horizontalCollision
         ));
 
-        // B. NATYCHMIAST wysyłamy pakiet ATAKU.
-        mc.getNetworkHandler().sendPacket(PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking()));
+        mc.getNetworkHandler().sendPacket(
+            PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking())
+        );
 
-        // C. Opcjonalnie, wymach ręką (losowy)
         if (random.nextFloat() > 0.15f) {
             mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
         }
