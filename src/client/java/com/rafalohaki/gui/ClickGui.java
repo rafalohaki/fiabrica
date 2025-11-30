@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.client.MinecraftClient;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +60,14 @@ public class ClickGui extends Screen {
     protected void init() {
         LOGGER.info("ClickGui init - Screen size: {}x{}", this.width, this.height);
         scrollOffset = 0;
+        
+        // Register scroll event using Fabric Screen Events API
+        ScreenMouseEvents.allowMouseScroll(this).register((screen, mouseX, mouseY, horizontalAmount, verticalAmount) -> {
+            // Handle scroll - negative = scroll down, positive = scroll up
+            scrollOffset -= (int)(verticalAmount * 20);
+            clampScrollOffset();
+            return true; // Allow default handling too
+        });
     }
     
     @Override
@@ -223,12 +232,12 @@ public class ClickGui extends Screen {
     
     private String getCategoryIcon(Category category) {
         return switch (category) {
-            case COMBAT -> "⚔️";
-            case MOVEMENT -> "👟";
-            case RENDER -> "👁️";
-            case PLAYER -> "👤";
-            case WORLD -> "🌍";
-            case MISC -> "⚙️";
+            case COMBAT -> "[C]";
+            case MOVEMENT -> "[M]";
+            case RENDER -> "[R]";
+            case PLAYER -> "[P]";
+            case WORLD -> "[W]";
+            case MISC -> "[X]";
         };
     }
     
@@ -401,11 +410,18 @@ public class ClickGui extends Screen {
     }
     
     /**
-     * Handle scroll - called from render
+     * Handle scroll input from GLFW
      */
-    private void handleScroll(double scrollDelta) {
-        scrollOffset -= (int)(scrollDelta * 20);
-        
+    private void checkScrollInput() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        // Scroll handling via tick - simplified approach
+        // For full scroll support, consider using Fabric Screen Events API
+    }
+    
+    /**
+     * Clamp scroll offset to valid range
+     */
+    private void clampScrollOffset() {
         var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
         int totalHeight = modules.size() * (moduleHeight + 4);
         int maxScroll = Math.max(0, totalHeight - moduleAreaHeight);
