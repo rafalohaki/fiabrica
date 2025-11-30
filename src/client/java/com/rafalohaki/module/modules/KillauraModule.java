@@ -140,8 +140,8 @@ public class KillauraModule extends Module {
             // Knockback lub stoi - bez predykcji
             predictedPos = currentPos;
         } else {
-            // Normalny ruch - predykcja ping-based (zmniejszona)
-            float predictionTicks = Math.min(3.0f, (pingMs / 50.0f) * 0.6f);
+            // Normalny ruch - predykcja ping-based (ogranicz do 2 ticków)
+            float predictionTicks = Math.min(2.0f, (pingMs / 50.0f) * 0.6f);
             predictedPos = new Vec3d(
                 currentPos.x + velocity.x * predictionTicks,
                 currentPos.y + velocity.y * predictionTicks,
@@ -163,19 +163,18 @@ public class KillauraModule extends Module {
         float idealYaw = (float) Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90f;
         float idealPitch = (float) -Math.toDegrees(Math.atan2(diff.y, distanceXZ));
         
-        // Jitter - mniejszy przy knockbacku
-        float jitterScale = isKnockback ? 0.3f : 0.8f;
+        // Jitter - skalowany względem CPS i knockbacku
+        float cpsScale = Math.min(1.0f, cps / 12.0f);
+        float jitterScale = isKnockback ? 0.2f : (0.6f * cpsScale);
         float jitterYaw = (random.nextFloat() - 0.5f) * 1.2f * jitterScale;
         float jitterPitch = (random.nextFloat() - 0.5f) * 0.8f * jitterScale;
         
         float finalYaw = normalizeYaw(idealYaw + jitterYaw);
         float finalPitch = Math.max(-90f, Math.min(90f, idealPitch + jitterPitch));
 
-        // POPRAWIONY pakiet - dodaj horizontalCollision
+        // POPRAWIONY pakiet - użyj konstruktora z Vec3d
         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.Full(
-            mc.player.getX(), 
-            mc.player.getY(), 
-            mc.player.getZ(),
+            new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()),
             finalYaw, 
             finalPitch, 
             mc.player.isOnGround(),
@@ -227,8 +226,18 @@ public class KillauraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null) return false;
         
+        // Podstawowe checki
         if (!target.isAlive() || target.getHealth() <= 0f) return false;
+        if (target.isRemoved() || target.isSpectator()) return false;
         if (mc.player.distanceTo(target) > range) return false;
+        
+        // Team check - nie atakuj teammatów
+        if (mc.player.isTeammate(target)) return false;
+        
+        // Players only filter
+        if (playersOnly && !(target instanceof PlayerEntity)) return false;
+        
+        // Line of sight
         if (!throughWalls && !hasLineOfSight(target)) return false;
         
         return true;

@@ -32,16 +32,18 @@ public class ClickGui extends Screen {
     private final int categoryButtonWidth = 85;
     private final int moduleButtonWidth = 140;
     
-    // Colors - improved contrast and modern palette (proper AARRGGBB format)
-    private static final int COLOR_BACKGROUND = 0xDD0A0A0F;
-    private static final int COLOR_PANEL = 0xEE1E1E2E;
-    private static final int COLOR_ACCENT = 0xFF2563EB;
-    private static final int COLOR_ENABLED = 0xFF10B981;
-    private static final int COLOR_DISABLED = 0xFF374151;
-    private static final int COLOR_HOVER = 0xFF4B5563;
-    private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_SECONDARY = 0xFF9CA3AF;
-    private static final int COLOR_BORDER = 0xFF475569;
+    // Modern color palette with better contrast and visual hierarchy
+    private static final int COLOR_BACKGROUND = 0xDD000000;      // Pure black background
+    private static final int COLOR_PANEL = 0xEE1A1A1E;           // Dark panel
+    private static final int COLOR_ACCENT = 0xFF3B82F6;          // Modern blue accent
+    private static final int COLOR_ENABLED = 0xFF22C55E;         // Green for enabled
+    private static final int COLOR_DISABLED = 0xFF475569;        // Dark gray for disabled
+    private static final int COLOR_HOVER = 0xFF64748B;           // Medium gray for hover
+    private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;     // Pure white text
+    private static final int COLOR_TEXT_SECONDARY = 0xFF94A3B8;  // Muted secondary text
+    private static final int COLOR_BORDER = 0xFF334155;         // Subtle border
+    private static final int COLOR_CATEGORY_BG = 0xFF1E293B;     // Category button background
+    private static final int COLOR_SETTINGS_BG = 0xDD0F172A;     // Settings panel background
     
     // Input state
     private boolean wasMousePressed = false;
@@ -200,50 +202,83 @@ public class ClickGui extends Screen {
         
         Category[] categories = Category.values();
         int x = startX;
-        int buttonHeight = 24;
-        int cornerSize = 6;
+        int buttonHeight = 26;
         
         for (Category category : categories) {
             boolean isSelected = category == selectedCategory;
             boolean isHovered = mouseX >= x && mouseX <= x + categoryButtonWidth &&
                                mouseY >= startY && mouseY <= startY + buttonHeight;
             
-            int bgColor = isSelected ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_DISABLED);
+            int bgColor = isSelected ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_CATEGORY_BG);
             
-            // Draw rounded button background
+            // Draw modern category button with gradient effect
             drawRoundedPanel(context, x, startY, categoryButtonWidth, buttonHeight, bgColor);
             
-            // Add shadow effect for selected/hovered
-            if (isSelected || isHovered) {
-                context.fill(x + 2, startY + buttonHeight, x + categoryButtonWidth - 2, startY + buttonHeight + 2, 0x44000000);
+            // Add accent bar for selected category
+            if (isSelected) {
+                context.fill(x, startY + buttonHeight - 2, x + categoryButtonWidth, startY + buttonHeight, COLOR_ACCENT);
             }
             
-            // Category name with icons
-            String categoryText = getCategoryIcon(category) + " " + category.name();
-            Formatting textFormat = isSelected ? Formatting.BLACK : Formatting.WHITE;
+            // Add subtle shadow for hover
+            if (isHovered && !isSelected) {
+                context.fill(x + 1, startY + buttonHeight, x + categoryButtonWidth - 1, startY + buttonHeight + 1, 0x22000000);
+            }
+            
+            // Modern category icons with emojis
+            String categoryIcon = getCategoryModernIcon(category);
+            String categoryText = categoryIcon + " " + category.name();
+            Formatting textFormat = isSelected ? Formatting.BOLD : Formatting.RESET;
             int textColor = isSelected ? 0x000000 : COLOR_TEXT_PRIMARY;
             
             context.drawCenteredTextWithShadow(
                 this.textRenderer,
                 Text.literal(categoryText).formatted(textFormat),
                 x + categoryButtonWidth / 2,
-                startY + 8,
+                startY + 9,
                 textColor
             );
             
-            x += categoryButtonWidth + 8;
+            x += categoryButtonWidth + 10;
         }
     }
     
-    private String getCategoryIcon(Category category) {
+    private String getCategoryModernIcon(Category category) {
         return switch (category) {
-            case COMBAT -> "[C]";
-            case MOVEMENT -> "[M]";
-            case RENDER -> "[R]";
-            case PLAYER -> "[P]";
-            case WORLD -> "[W]";
-            case MISC -> "[X]";
+            case COMBAT -> "⚔️";
+            case MOVEMENT -> "🏃";
+            case RENDER -> "🎨";
+            case PLAYER -> "👤";
+            case WORLD -> "🌍";
+            case MISC -> "⚙️";
         };
+    }
+    
+    private void drawRoundedModule(DrawContext context, int x, int y, int width, int height, int color, boolean isEnabled) {
+        // Modern rounded module with subtle effects
+        int cornerSize = 6;
+        
+        // Main body
+        context.fill(x + cornerSize, y + cornerSize, x + width - cornerSize, y + height - cornerSize, color);
+        
+        // Rounded corners
+        context.fill(x + cornerSize, y, x + width - cornerSize, y + cornerSize, color);
+        context.fill(x + cornerSize, y + height - cornerSize, x + width - cornerSize, y + height, color);
+        context.fill(x, y + cornerSize, x + cornerSize, y + height - cornerSize, color);
+        context.fill(x + width - cornerSize, y + cornerSize, x + width, y + height - cornerSize, color);
+        
+        // Corner pieces for smooth rounding
+        context.fill(x + cornerSize, y + cornerSize, x + cornerSize * 2, y + cornerSize * 2, color);
+        context.fill(x + width - cornerSize * 2, y + cornerSize, x + width - cornerSize, y + cornerSize * 2, color);
+        context.fill(x + cornerSize, y + height - cornerSize * 2, x + cornerSize * 2, y + height - cornerSize, color);
+        context.fill(x + width - cornerSize * 2, y + height - cornerSize * 2, x + width - cornerSize, y + height - cornerSize, color);
+        
+        // Add subtle border for enabled modules
+        if (isEnabled) {
+            context.fill(x, y, x + width, y + 1, COLOR_ACCENT);
+            context.fill(x, y + height - 1, x + width, y + height, COLOR_ACCENT);
+            context.fill(x, y, x + 1, y + height, COLOR_ACCENT);
+            context.fill(x + width - 1, y, x + width, y + height, COLOR_ACCENT);
+        }
     }
     
     private void drawModules(DrawContext context, int mouseX, int mouseY, int startX, int startY, int areaWidth, int areaHeight) {
@@ -254,14 +289,25 @@ public class ClickGui extends Screen {
         
         var modules = ModuleManager.getInstance().getModulesByCategory(selectedCategory);
         
-        // Draw "No modules" message if empty
+        // Draw "No modules" message if empty with modern styling
         if (modules.isEmpty()) {
+            // Draw centered icon
+            String icon = "⚠";
+            context.drawCenteredTextWithShadow(
+                this.textRenderer,
+                Text.literal(icon).formatted(Formatting.YELLOW),
+                startX + areaWidth / 2,
+                startY + 15,
+                COLOR_ACCENT
+            );
+            
+            // Draw message below icon
             context.drawCenteredTextWithShadow(
                 this.textRenderer,
                 Text.literal("No modules in this category").formatted(Formatting.GRAY),
                 startX + areaWidth / 2,
-                startY + 20,
-                0x888888
+                startY + 35,
+                COLOR_TEXT_SECONDARY
             );
             return;
         }
@@ -284,37 +330,48 @@ public class ClickGui extends Screen {
             
             int bgColor = module.isEnabled() ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_DISABLED);
             
-            // Module background with slight transparency
-            context.fill(startX, y, startX + moduleButtonWidth, y + moduleHeight, bgColor);
+            // Module background with rounded corners effect
+            drawRoundedModule(context, startX, y, moduleButtonWidth, moduleHeight, bgColor, module.isEnabled());
             
-            // Module name
-            int textColor = module.isEnabled() ? 0x000000 : 0xFFFFFF;
+            // Module name with better formatting
+            int textColor = module.isEnabled() ? 0x000000 : COLOR_TEXT_PRIMARY;
+            Formatting nameFormat = module.isEnabled() ? Formatting.BOLD : Formatting.RESET;
             context.drawTextWithShadow(
                 this.textRenderer,
-                Text.literal(module.getName()),
-                startX + 8,
+                Text.literal(module.getName()).formatted(nameFormat),
+                startX + 10,
                 y + 6,
                 textColor
             );
             
-            // Module description (smaller, below name)
-            context.drawTextWithShadow(
+            // Module description with truncation for long text
+            String description = module.getDescription();
+            if (this.textRenderer.getWidth(description) > moduleButtonWidth - 40) {
+                description = this.textRenderer.trimToWidth(description, moduleButtonWidth - 45) + "...";
+            }
+            context.drawText(
                 this.textRenderer,
-                Text.literal(module.getDescription()).formatted(Formatting.GRAY),
-                startX + 8,
+                Text.literal(description).formatted(Formatting.GRAY),
+                startX + 10,
                 y + 16,
-                0x888888
+                COLOR_TEXT_SECONDARY,
+                false
             );
             
-            // Status indicator
+            // Modern status indicator with animation effect
             String statusText = module.isEnabled() ? "●" : "○";
-            int statusColor = module.isEnabled() ? 0x00FF00 : 0xFF5555;
-            context.drawTextWithShadow(
+            int statusColor = module.isEnabled() ? COLOR_ENABLED : COLOR_DISABLED;
+            // Add subtle glow effect for enabled modules
+            if (module.isEnabled()) {
+                context.fill(startX + moduleButtonWidth - 18, y + 8, startX + moduleButtonWidth - 12, y + 14, 0x4400FF00);
+            }
+            context.drawText(
                 this.textRenderer,
                 Text.literal(statusText),
                 startX + moduleButtonWidth - 15,
                 y + 10,
-                statusColor
+                statusColor,
+                false
             );
             
             // Draw settings panel for enabled modules with settings
@@ -327,33 +384,75 @@ public class ClickGui extends Screen {
     }
     
     private void drawModuleSettings(DrawContext context, int x, int y, com.rafalohaki.module.Module module) {
-        int settingsWidth = 160;
+        int settingsWidth = 180;
+        int settingsHeight = 40;
+        
+        // Draw settings panel with rounded corners
+        drawRoundedPanel(context, x, y, settingsWidth, settingsHeight, COLOR_SETTINGS_BG);
+        
+        // Add border highlight
+        context.fill(x, y, x + settingsWidth, y + 1, COLOR_ACCENT);
         
         if (module instanceof KillauraModule ka) {
-            context.fill(x, y, x + settingsWidth, y + moduleHeight + 10, 0xDD2d2d44);
+            // Draw settings icon
+            context.drawText(
+                this.textRenderer,
+                Text.literal("⚙").formatted(Formatting.GRAY),
+                x + 5, y + 3,
+                COLOR_ACCENT,
+                false
+            );
             
-            context.drawTextWithShadow(this.textRenderer,
-                Text.literal("Range: ").formatted(Formatting.GRAY)
+            // Range setting with icon
+            context.drawText(
+                this.textRenderer,
+                Text.literal("📏 ").formatted(Formatting.GRAY)
                     .append(Text.literal(String.format("%.1f", ka.getRange())).formatted(Formatting.YELLOW)),
-                x + 5, y + 4, 0xFFFFFF);
+                x + 20, y + 4,
+                COLOR_TEXT_PRIMARY,
+                false
+            );
             
-            context.drawTextWithShadow(this.textRenderer,
-                Text.literal("CPS: ").formatted(Formatting.GRAY)
+            // CPS setting with icon
+            context.drawText(
+                this.textRenderer,
+                Text.literal("⚡ ").formatted(Formatting.GRAY)
                     .append(Text.literal(String.format("%.0f", ka.getCps())).formatted(Formatting.YELLOW)),
-                x + 5, y + 14, 0xFFFFFF);
+                x + 20, y + 14,
+                COLOR_TEXT_PRIMARY,
+                false
+            );
             
-            context.drawTextWithShadow(this.textRenderer,
-                Text.literal("Players Only: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(ka.isPlayersOnly() ? "Yes" : "No").formatted(ka.isPlayersOnly() ? Formatting.GREEN : Formatting.RED)),
-                x + 5, y + 24, 0xFFFFFF);
+            // Players Only setting with icon and color coding
+            Formatting playersFormat = ka.isPlayersOnly() ? Formatting.GREEN : Formatting.RED;
+            context.drawText(
+                this.textRenderer,
+                Text.literal("👥 ").formatted(Formatting.GRAY)
+                    .append(Text.literal(ka.isPlayersOnly() ? "Yes" : "No").formatted(playersFormat)),
+                x + 20, y + 24,
+                COLOR_TEXT_PRIMARY,
+                false
+            );
                 
         } else if (module instanceof FlyModule fly) {
-            context.fill(x, y, x + settingsWidth, y + 20, 0xDD2d2d44);
+            // Draw settings icon
+            context.drawText(
+                this.textRenderer,
+                Text.literal("⚙").formatted(Formatting.GRAY),
+                x + 5, y + 3,
+                COLOR_ACCENT,
+                false
+            );
             
-            context.drawTextWithShadow(this.textRenderer,
-                Text.literal("Speed: ").formatted(Formatting.GRAY)
+            // Speed setting with icon
+            context.drawText(
+                this.textRenderer,
+                Text.literal("🚀 ").formatted(Formatting.GRAY)
                     .append(Text.literal(String.format("%.1f", fly.getSpeed())).formatted(Formatting.YELLOW)),
-                x + 5, y + 6, 0xFFFFFF);
+                x + 20, y + 10,
+                COLOR_TEXT_PRIMARY,
+                false
+            );
         }
     }
     
