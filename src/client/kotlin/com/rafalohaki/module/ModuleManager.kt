@@ -1,6 +1,7 @@
 package com.rafalohaki.module
 
 import com.rafalohaki.module.modules.FlyModule
+import com.rafalohaki.module.modules.KillauraModule
 
 /**
  * Manages all hack modules.
@@ -12,9 +13,10 @@ object ModuleManager {
     init {
         // Register all modules here
         register(FlyModule())
+        register(KillauraModule())
         // Add more modules:
-        // register(KillauraModule())
         // register(EspModule())
+        // register(ScaffoldModule())
     }
     
     /**
