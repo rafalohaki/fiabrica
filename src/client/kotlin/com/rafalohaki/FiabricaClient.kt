@@ -25,7 +25,7 @@ object FiabricaClient : ClientModInitializer {
                 "key.fiabrica.openGui",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "key.categories.misc"
+                "key.categories.gameplay"
             )
         )
         
