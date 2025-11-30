@@ -31,17 +31,24 @@ public class ClickGui extends Screen {
     private final int categoryButtonWidth = 85;
     private final int moduleButtonWidth = 140;
     
-    // Colors
-    private static final int COLOR_BACKGROUND = 0xCC1a1a2e;
-    private static final int COLOR_PANEL = 0xEE16213e;
-    private static final int COLOR_ACCENT = 0xFF0f3460;
-    private static final int COLOR_ENABLED = 0xFF4ecca3;
-    private static final int COLOR_DISABLED = 0xFF393e46;
-    private static final int COLOR_HOVER = 0xFF2d4059;
+    // Colors - improved contrast and modern palette
+    private static final int COLOR_BACKGROUND = 0xDD0a0a0f;
+    private static final int COLOR_PANEL = 0xEE1e1e2e;
+    private static final int COLOR_ACCENT = 0xFF2563eb;
+    private static final int COLOR_ENABLED = 0xFF10b981;
+    private static final int COLOR_DISABLED = 0xFF374151;
+    private static final int COLOR_HOVER = 0xFF4b5563;
+    private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
+    private static final int COLOR_TEXT_SECONDARY = 0xFF9ca3af;
+    private static final int COLOR_BORDER = 0xFF475569;
     
     // Input state
     private boolean wasMousePressed = false;
     private double lastScrollY = 0;
+    
+    // Animation state
+    private float animationProgress = 0f;
+    private long lastAnimationTime = System.currentTimeMillis();
     
     public ClickGui() {
         super(Text.literal("Fiabrica ClickGUI"));
@@ -56,6 +63,9 @@ public class ClickGui extends Screen {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Update animation
+        updateAnimation(delta);
+        
         // Handle mouse input
         MinecraftClient mc = MinecraftClient.getInstance();
         long windowHandle = mc.getWindow().getHandle();
@@ -76,29 +86,31 @@ public class ClickGui extends Screen {
         // Render background (darkened game view)
         super.render(context, mouseX, mouseY, delta);
         
-        // Draw semi-transparent overlay
-        context.fill(0, 0, this.width, this.height, COLOR_BACKGROUND);
+        // Draw semi-transparent overlay with animation
+        float bgAlpha = Math.min(1.0f, animationProgress * 2.0f);
+        int animatedBg = (int)(bgAlpha * 255) << 24 | (COLOR_BACKGROUND & 0x00FFFFFF);
+        context.fill(0, 0, this.width, this.height, animatedBg);
         
-        // Draw main panel
+        // Draw main panel with rounded corners effect
         int panelX = 20;
         int panelY = 30;
         int panelWidth = this.width - 40;
         int panelHeight = this.height - 60;
         
-        context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, COLOR_PANEL);
+        drawRoundedPanel(context, panelX, panelY, panelWidth, panelHeight, COLOR_PANEL);
         
-        // Draw title with shadow effect
+        // Draw title with gradient effect
         String title = "✦ FIABRICA ✦";
         context.drawCenteredTextWithShadow(
             this.textRenderer,
             Text.literal(title).formatted(Formatting.AQUA, Formatting.BOLD),
             this.width / 2,
             panelY + 8,
-            0xFFFFFF
+            COLOR_TEXT_PRIMARY
         );
         
-        // Draw separator line
-        context.fill(panelX + 10, panelY + 25, panelX + panelWidth - 10, panelY + 26, COLOR_ACCENT);
+        // Draw separator line with gradient
+        context.fillGradient(panelX + 10, panelY + 25, panelX + panelWidth - 10, panelY + 26, COLOR_ACCENT, COLOR_BORDER);
         
         // Draw category buttons
         drawCategoryButtons(context, mouseX, mouseY, panelX + 10, panelY + 35);
@@ -106,14 +118,14 @@ public class ClickGui extends Screen {
         // Draw modules for selected category
         drawModules(context, mouseX, mouseY, panelX + 10, panelY + 70, panelWidth - 20, panelHeight - 100);
         
-        // Draw instructions and debug info
+        // Draw instructions with better formatting
         String instructions = "Click to toggle • Scroll to navigate • ESC to close";
         context.drawTextWithShadow(
             this.textRenderer,
             Text.literal(instructions).formatted(Formatting.GRAY),
             panelX + 10,
             panelY + panelHeight - 18,
-            0xAAAAAA
+            COLOR_TEXT_SECONDARY
         );
         
         // Draw module count
@@ -125,7 +137,7 @@ public class ClickGui extends Screen {
             Text.literal(countText).formatted(Formatting.DARK_GRAY),
             panelX + panelWidth - countWidth - 10,
             panelY + panelHeight - 18,
-            0x888888
+            COLOR_TEXT_SECONDARY
         );
     }
     
@@ -135,13 +147,47 @@ public class ClickGui extends Screen {
     private int categoryStartX, categoryStartY;
     private int moduleStartX, moduleStartY, moduleAreaWidth, moduleAreaHeight;
     
+    private void updateAnimation(float delta) {
+        long currentTime = System.currentTimeMillis();
+        long deltaTime = currentTime - lastAnimationTime;
+        
+        if (deltaTime > 16) { // Cap at ~60 FPS
+            if (animationProgress < 1.0f) {
+                animationProgress = Math.min(1.0f, animationProgress + delta * 0.1f);
+            }
+            lastAnimationTime = currentTime;
+        }
+    }
+    
+    private void drawRoundedPanel(DrawContext context, int x, int y, int width, int height, int color) {
+        // Simple rounded corners using multiple rectangles
+        int cornerSize = 8;
+        
+        // Main body
+        context.fill(x + cornerSize, y, x + width - cornerSize, y + height, color);
+        context.fill(x, y + cornerSize, x + width, y + height - cornerSize, color);
+        
+        // Corner pieces (rounded effect)
+        context.fill(x + cornerSize, y + cornerSize, x + cornerSize * 2, y + cornerSize * 2, color);
+        context.fill(x + width - cornerSize * 2, y + cornerSize, x + width - cornerSize, y + cornerSize * 2, color);
+        context.fill(x + cornerSize, y + height - cornerSize * 2, x + cornerSize * 2, y + height - cornerSize, color);
+        context.fill(x + width - cornerSize * 2, y + height - cornerSize * 2, x + width - cornerSize, y + height - cornerSize, color);
+        
+        // Border
+        context.fill(x, y, x + width, y + 1, COLOR_BORDER);
+        context.fill(x, y + height - 1, x + width, y + height, COLOR_BORDER);
+        context.fill(x, y, x + 1, y + height, COLOR_BORDER);
+        context.fill(x + width - 1, y, x + width, y + height, COLOR_BORDER);
+    }
+    
     private void drawCategoryButtons(DrawContext context, int mouseX, int mouseY, int startX, int startY) {
         categoryStartX = startX;
         categoryStartY = startY;
         
         Category[] categories = Category.values();
         int x = startX;
-        int buttonHeight = 22;
+        int buttonHeight = 24;
+        int cornerSize = 6;
         
         for (Category category : categories) {
             boolean isSelected = category == selectedCategory;
@@ -151,20 +197,39 @@ public class ClickGui extends Screen {
             int bgColor = isSelected ? COLOR_ENABLED : (isHovered ? COLOR_HOVER : COLOR_DISABLED);
             
             // Draw rounded button background
-            context.fill(x, startY, x + categoryButtonWidth, startY + buttonHeight, bgColor);
+            drawRoundedPanel(context, x, startY, categoryButtonWidth, buttonHeight, bgColor);
             
-            // Draw category name
+            // Add shadow effect for selected/hovered
+            if (isSelected || isHovered) {
+                context.fill(x + 2, startY + buttonHeight, x + categoryButtonWidth - 2, startY + buttonHeight + 2, 0x44000000);
+            }
+            
+            // Category name with icons
+            String categoryText = getCategoryIcon(category) + " " + category.name();
             Formatting textFormat = isSelected ? Formatting.BLACK : Formatting.WHITE;
+            int textColor = isSelected ? 0x000000 : COLOR_TEXT_PRIMARY;
+            
             context.drawCenteredTextWithShadow(
                 this.textRenderer,
-                Text.literal(category.name()).formatted(textFormat),
+                Text.literal(categoryText).formatted(textFormat),
                 x + categoryButtonWidth / 2,
-                startY + 7,
-                isSelected ? 0x000000 : 0xFFFFFF
+                startY + 8,
+                textColor
             );
             
-            x += categoryButtonWidth + 5;
+            x += categoryButtonWidth + 8;
         }
+    }
+    
+    private String getCategoryIcon(Category category) {
+        return switch (category) {
+            case COMBAT -> "⚔️";
+            case MOVEMENT -> "👟";
+            case RENDER -> "👁️";
+            case PLAYER -> "👤";
+            case WORLD -> "🌍";
+            case MISC -> "⚙️";
+        };
     }
     
     private void drawModules(DrawContext context, int mouseX, int mouseY, int startX, int startY, int areaWidth, int areaHeight) {
@@ -278,6 +343,9 @@ public class ClickGui extends Screen {
         }
     }
     
+    /**
+     * Close GUI with animation
+     */
     @Override
     public void close() {
         LOGGER.info("ClickGui closed");
@@ -296,7 +364,7 @@ public class ClickGui extends Screen {
         // Check category button clicks
         Category[] categories = Category.values();
         int x = categoryStartX;
-        int buttonHeight = 22;
+        int buttonHeight = 24; // Updated to match drawCategoryButtons
         
         for (Category category : categories) {
             if (mouseX >= x && mouseX <= x + categoryButtonWidth &&
@@ -306,7 +374,7 @@ public class ClickGui extends Screen {
                 LOGGER.debug("Selected category: {}", category);
                 return;
             }
-            x += categoryButtonWidth + 5;
+            x += categoryButtonWidth + 8; // Updated to match drawCategoryButtons
         }
         
         // Check module button clicks
