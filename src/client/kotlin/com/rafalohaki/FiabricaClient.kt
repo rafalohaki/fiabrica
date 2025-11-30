@@ -34,7 +34,7 @@ object FiabricaClient : ClientModInitializer {
             EventBus.post(ClientTickEvent())
             
             // Handle GUI keybind
-            if (openGuiKey.wasPressed()) {
+            while (openGuiKey.wasPressed()) {
                 AppManager.openApp(FiabricaGuiApp())
             }
         }

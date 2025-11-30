@@ -20,44 +20,31 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 import kotlin.random.Random
 
-/**
- * Humanized Killaura with Grim bypass.
- * Uses silent rotations, smooth interpolation, raycast LOS checks,
- * attack cooldown respect, and noise injection to simulate human behavior.
- */
 class KillauraModule : Module(
     name = "Killaura",
     description = "Humanized combat bot with Grim AC bypass",
     category = Category.COMBAT
 ) {
-    // Settings (exposed to GUI)
     var range = 4.2f
         private set
-    var cps = 12f // Clicks per second
+    var cps = 12f
         private set
-    var rotationSpeed = 15f // Degrees per tick
+    var rotationSpeed = 15f
         private set
     var playersOnly = false
         private set
     var throughWalls = false
         private set
     
-    // Internal state (thread-safe)
     private val currentTarget = AtomicReference<LivingEntity?>(null)
     private val lastAttackTime = AtomicReference(0L)
-    
-    // Silent rotations (server-side only, client camera unchanged)
     private var serverYaw = 0f
     private var serverPitch = 0f
     private var isRotating = false
     
-    // State machine
     private enum class State { IDLE, SCANNING, ROTATING, READY, ATTACKING }
     private var currentState = State.IDLE
-    
-    // Coroutine scope
     private var scanJob: Job? = null
-    
     private val tickHandler: (ClientTickEvent) -> Unit = { onTick() }
     
     override fun onEnable() {
@@ -66,11 +53,10 @@ class KillauraModule : Module(
         serverPitch = mc.player?.pitch ?: 0f
         currentState = State.IDLE
         
-        // Start background scanning coroutine
         scanJob = CoroutineScope(Dispatchers.Default).launch {
             while (isActive) {
                 scanForTargets()
-                delay(50) // Scan every 50ms, not every tick
+                delay(50)
             }
         }
     }
@@ -90,9 +76,6 @@ class KillauraModule : Module(
         EventBus.unregister(tickHandler)
     }
     
-    /**
-     * Main tick handler (runs on main thread).
-     */
     private fun onTick() {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return
@@ -100,9 +83,7 @@ class KillauraModule : Module(
         
         when (currentState) {
             State.IDLE -> {
-                if (target != null) {
-                    currentState = State.SCANNING
-                }
+                if (target != null) currentState = State.SCANNING
             }
             State.SCANNING -> {
                 if (target == null || !isValidTarget(target)) {
@@ -117,11 +98,9 @@ class KillauraModule : Module(
                     return
                 }
                 
-                // Smooth rotation to target
                 updateRotations(target)
                 sendRotations()
                 
-                // Check if rotations are close enough
                 val (idealYaw, idealPitch) = calculateIdealRotations(target)
                 val yawDelta = abs(normalizeYaw(idealYaw - serverYaw))
                 val pitchDelta = abs(idealPitch - serverPitch)
@@ -136,11 +115,9 @@ class KillauraModule : Module(
                     return
                 }
                 
-                // Keep rotating (micro-corrections)
                 updateRotations(target)
                 sendRotations()
                 
-                // Check attack cooldown
                 val cooldown = player.getAttackCooldownProgress(0.5f)
                 val timeSinceLastAttack = System.currentTimeMillis() - lastAttackTime.get()
                 val minDelay = (1000f / cps).toLong()
@@ -155,26 +132,19 @@ class KillauraModule : Module(
                     return
                 }
                 
-                // Attack!
                 attackEntity(target)
                 lastAttackTime.set(System.currentTimeMillis())
-                
-                // Return to rotating for next attack
                 currentState = State.ROTATING
             }
         }
     }
     
-    /**
-     * Scan for targets (background thread).
-     */
     private fun scanForTargets() {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return
         val world = mc.world ?: return
         
-        // Find all entities in range
-        val playerPos = player.pos
+        val playerPos = player.getPos()
         val box = Box.of(playerPos, range.toDouble() * 2, range.toDouble() * 2, range.toDouble() * 2)
         val entities = world.getOtherEntities(player, box) { entity ->
             entity is LivingEntity && 
@@ -183,7 +153,6 @@ class KillauraModule : Module(
             (!playersOnly || entity is PlayerEntity)
         }
         
-        // Find closest valid target
         val closest = entities
             .filterIsInstance<LivingEntity>()
             .filter { isValidTarget(it) }
@@ -192,32 +161,24 @@ class KillauraModule : Module(
         currentTarget.set(closest)
     }
     
-    /**
-     * Check if target is valid (alive, in range, visible if needed).
-     */
     private fun isValidTarget(target: LivingEntity): Boolean {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return false
         
         if (!target.isAlive || target.health <= 0f) return false
         if (player.distanceTo(target) > range) return false
-        
-        // Raycast check (line of sight)
         if (!throughWalls && !hasLineOfSight(target)) return false
         
         return true
     }
     
-    /**
-     * Raycast to check if target is visible (no blocks between).
-     */
     private fun hasLineOfSight(target: Entity): Boolean {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return false
         val world = mc.world ?: return false
         
         val eyePos = player.getEyePos()
-        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val direction = targetPos.subtract(eyePos).normalize()
         val distance = eyePos.distanceTo(targetPos)
         
@@ -230,21 +191,16 @@ class KillauraModule : Module(
         )
         
         val result = world.raycast(context)
-        
-        // If raycast hits block before reaching target, no LOS
         return result == null || result.type == net.minecraft.util.hit.HitResult.Type.MISS ||
                result.pos.distanceTo(eyePos) >= distance - 0.1
     }
     
-    /**
-     * Calculate ideal rotations to target.
-     */
     private fun calculateIdealRotations(target: Entity): Pair<Float, Float> {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return Pair(0f, 0f)
         
         val eyePos = player.getEyePos()
-        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val diff = targetPos.subtract(eyePos)
         
         val distance = sqrt(diff.x * diff.x + diff.z * diff.z)
@@ -254,23 +210,14 @@ class KillauraModule : Module(
         return Pair(normalizeYaw(yaw), pitch.coerceIn(-90f, 90f))
     }
     
-    /**
-     * Update silent rotations with smooth interpolation + noise.
-     */
     private fun updateRotations(target: Entity) {
         val (idealYaw, idealPitch) = calculateIdealRotations(target)
-        
-        // Normalize current yaw
         serverYaw = normalizeYaw(serverYaw)
         
-        // Calculate yaw delta (shortest path)
         var deltaYaw = normalizeYaw(idealYaw - serverYaw)
-        
-        // Add human-like noise (micro-corrections)
         val noise = Random.nextFloat() * 0.2f - 0.1f
         deltaYaw += noise
         
-        // Smooth interpolation with ease-in-out curve
         val yawStep = (rotationSpeed * easeInOutCubic(abs(deltaYaw) / 180f)).coerceIn(1f, rotationSpeed)
         
         if (abs(deltaYaw) > yawStep) {
@@ -279,7 +226,6 @@ class KillauraModule : Module(
             serverYaw = idealYaw
         }
         
-        // Same for pitch (simpler, no wrap-around)
         var deltaPitch = idealPitch - serverPitch
         deltaPitch += noise * 0.5f
         
@@ -293,8 +239,7 @@ class KillauraModule : Module(
         
         serverPitch = serverPitch.coerceIn(-90f, 90f)
         
-        // Randomly skip packet send (simulate human distraction)
-        if (Random.nextFloat() < 0.05f) { // 5% chance to skip
+        if (Random.nextFloat() < 0.05f) {
             isRotating = false
             return
         }
@@ -302,9 +247,6 @@ class KillauraModule : Module(
         isRotating = true
     }
     
-    /**
-     * Send silent rotations to server (client camera unchanged).
-     */
     private fun sendRotations() {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return
@@ -319,31 +261,22 @@ class KillauraModule : Module(
         networkHandler.sendPacket(packet)
     }
     
-    /**
-     * Attack entity with packets.
-     */
     private fun attackEntity(target: Entity) {
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return
         val networkHandler = mc.networkHandler ?: return
         
-        // Send attack packet
         val attackPacket = PlayerInteractEntityC2SPacket.attack(target, player.isSneaking)
         networkHandler.sendPacket(attackPacket)
         
-        // Send swing animation (humanized - not always)
-        if (Random.nextFloat() > 0.1f) { // 90% of the time
+        if (Random.nextFloat() > 0.1f) {
             val swingPacket = HandSwingC2SPacket(Hand.MAIN_HAND)
             networkHandler.sendPacket(swingPacket)
         }
         
-        // Reset sprint (vanilla behavior)
         player.resetLastAttackedTicks()
     }
     
-    /**
-     * Normalize yaw to -180 to 180 range.
-     */
     private fun normalizeYaw(yaw: Float): Float {
         var normalized = yaw % 360f
         if (normalized > 180f) normalized -= 360f
@@ -351,9 +284,6 @@ class KillauraModule : Module(
         return normalized
     }
     
-    /**
-     * Ease-in-out cubic function for smooth acceleration/deceleration.
-     */
     private fun easeInOutCubic(t: Float): Float {
         return if (t < 0.5f) {
             4f * t * t * t
@@ -362,7 +292,6 @@ class KillauraModule : Module(
         }
     }
     
-    // Setters for GUI
     fun setRange(newRange: Float) {
         range = newRange.coerceIn(3.0f, 6.0f)
     }
