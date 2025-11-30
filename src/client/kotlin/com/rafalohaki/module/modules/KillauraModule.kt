@@ -144,7 +144,7 @@ class KillauraModule : Module(
         val player = mc.player ?: return
         val world = mc.world ?: return
         
-        val playerPos = player.getPos()
+        val playerPos = player.pos
         val box = Box.of(playerPos, range.toDouble() * 2, range.toDouble() * 2, range.toDouble() * 2)
         val entities = world.getOtherEntities(player, box) { entity ->
             entity is LivingEntity && 
@@ -177,14 +177,14 @@ class KillauraModule : Module(
         val player = mc.player ?: return false
         val world = mc.world ?: return false
         
-        val eyePos = player.getEyePos()
-        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val eyePos = player.eyePos
+        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val direction = targetPos.subtract(eyePos).normalize()
         val distance = eyePos.distanceTo(targetPos)
         
         val context = RaycastContext(
             eyePos,
-            eyePos.add(direction.multiply(distance)),
+            eyePos.add(direction.scale(distance)),
             RaycastContext.ShapeType.OUTLINE,
             RaycastContext.FluidHandling.NONE,
             player
@@ -199,8 +199,8 @@ class KillauraModule : Module(
         val mc = MinecraftClient.getInstance()
         val player = mc.player ?: return Pair(0f, 0f)
         
-        val eyePos = player.getEyePos()
-        val targetPos = target.getPos().add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
+        val eyePos = player.eyePos
+        val targetPos = target.pos.add(0.0, target.standingEyeHeight.toDouble() * 0.5, 0.0)
         val diff = targetPos.subtract(eyePos)
         
         val distance = sqrt(diff.x * diff.x + diff.z * diff.z)
@@ -255,7 +255,8 @@ class KillauraModule : Module(
         val packet = PlayerMoveC2SPacket.LookAndOnGround(
             serverYaw,
             serverPitch,
-            player.isOnGround
+            player.isOnGround,
+            player.horizontalCollision
         )
         
         networkHandler.sendPacket(packet)
